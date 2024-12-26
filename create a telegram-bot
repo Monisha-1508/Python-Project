@@ -1,0 +1,111 @@
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Updater, CommandHandler, MessageHandler, CallbackQueryHandler, Filters, CallbackContext
+import requests
+
+# Replace with your Telegram Bot API Token
+TOKEN = "7319330687:AAEemE4o6KIKx-UlvKJtPQ7MsvfHcZxvNCU"
+
+
+# Start command
+def start(update: Update, context: CallbackContext):
+    update.message.reply_text("Welcome to the bot! Use /help to see available commands.")
+
+
+# Help command
+def help_command(update: Update, context: CallbackContext):
+    update.message.reply_text(
+        "Commands available:\n"
+        "/start - Start the bot\n"
+        "/buttons - Display inline buttons\n"
+        "/feedback - Submit feedback\n"
+        "/weather <city> - Get real-time weather\n"
+    )
+
+
+# Handling Buttons
+def buttons(update: Update, context: CallbackContext):
+    keyboard = [
+        [InlineKeyboardButton("Google", url="https://www.google.com")],
+        [InlineKeyboardButton("YouTube", url="https://www.youtube.com")],
+        [InlineKeyboardButton("LinkedIn", url="https://www.linkedin.com")],
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    update.message.reply_text("Choose a link:", reply_markup=reply_markup)
+
+
+# Multimedia Handling
+def handle_media(update: Update, context: CallbackContext):
+    if update.message.photo:
+        update.message.reply_text("Nice photo! 👍")
+    elif update.message.document:
+        update.message.reply_text("Document received! 📄")
+    elif update.message.video:
+        update.message.reply_text("Cool video! 🎥")
+    else:
+        update.message.reply_text("Unsupported media type.")
+
+
+# Feedback System
+def feedback(update: Update, context: CallbackContext):
+    update.message.reply_text("Please type your feedback.")
+    return 1  # Feedback state
+
+
+def save_feedback(update: Update, context: CallbackContext):
+    feedback_text = update.message.text
+    with open("feedback.txt", "a") as f:
+        f.write(feedback_text + "\n")
+    update.message.reply_text("Thank you for your feedback!")
+
+
+# Fetch Real-Time Weather
+def weather(update: Update, context: CallbackContext):
+    try:
+        city = " ".join(context.args)
+        if not city:
+            update.message.reply_text("Please provide a city name. Usage: /weather <city>")
+            return
+        api_key = "3019ddf7cb768106238ac425514d1434"  # Replace with your OpenWeatherMap API key
+        url = f"http://api.openweathermap.org/data/2.5/weather?q={city}&appid={api_key}&units=metric"
+        response = requests.get(url).json()
+        if response["cod"] == 200:
+            temp = response["main"]["temp"]
+            description = response["weather"][0]["description"]
+            update.message.reply_text(f"Weather in {city}:\nTemperature: {temp}°C\nCondition: {description}")
+        else:
+            update.message.reply_text("City not found.")
+    except Exception as e:
+        update.message.reply_text(f"An error occurred: {e}")
+
+
+# Unknown Command Handling
+def unknown(update: Update, context: CallbackContext):
+    update.message.reply_text(f"Sorry, '{update.message.text}' is not a valid command.")
+
+
+
+def main():
+    updater = Updater(TOKEN, use_context=True)
+    dp = updater.dispatcher
+
+    # Command handlers
+    dp.add_handler(CommandHandler("start", start))
+    dp.add_handler(CommandHandler("help", help_command))
+    dp.add_handler(CommandHandler("buttons", buttons))
+    dp.add_handler(CommandHandler("feedback", feedback))
+    dp.add_handler(CommandHandler("weather", weather))
+    dp.add_handler(MessageHandler(Filters.photo | Filters.document | Filters.video, handle_media))
+
+    # Message handler for saving feedback
+    dp.add_handler(MessageHandler(Filters.text & ~Filters.command, save_feedback))
+
+    # Handle unknown commands
+    dp.add_handler(MessageHandler(Filters.command, unknown))
+
+  
+    updater.start_polling()
+    updater.idle()
+
+
+if __name__ == "__main__":
+    main()
